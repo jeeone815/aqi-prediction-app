@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
 
-from config import MODELS_DIR, METRICS_DIR, POSTPROCESS_DIR
+from backend.config import MODELS_DIR, METRICS_DIR, POSTPROCESS_DIR
 
 # ─────────────────────────────────────────────
 # App setup
