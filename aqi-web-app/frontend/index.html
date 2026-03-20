@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AQI Prediction — India</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1a365d, #2b6cb0);
+      color: white;
+      padding: 24px 32px;
+    }
+    header h1 { font-size: 1.6rem; font-weight: 700; }
+    header p  { margin-top: 4px; font-size: 0.9rem; opacity: 0.85; }
+
+    nav {
+      display: flex;
+      gap: 8px;
+      background: white;
+      padding: 0 32px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    nav button {
+      padding: 14px 20px;
+      border: none;
+      background: transparent;
+      font-size: 0.9rem;
+      cursor: pointer;
+      color: #718096;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+    nav button.active {
+      color: #2b6cb0;
+      border-bottom-color: #2b6cb0;
+    }
+
+    .tab-content { display: none; padding: 32px; max-width: 1100px; margin: 0 auto; }
+    .tab-content.active { display: block; }
+
+    /* ── Cards ── */
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.07);
+      margin-bottom: 24px;
+    }
+    .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 16px; color: #2d3748; }
+
+    /* ── Metrics table ── */
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th {
+      background: #edf2f7;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: #4a5568;
+    }
+    td { padding: 10px 14px; border-bottom: 1px solid #f0f4f8; }
+    tr:hover td { background: #fafafa; }
+    tr.best-model td { background: #ebf8ff; font-weight: 600; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-best { background: #bee3f8; color: #2b6cb0; }
+
+    /* ── Predict form ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 0.82rem; font-weight: 600; color: #4a5568; }
+    .form-group input,
+    .form-group select {
+      padding: 9px 12px;
+      border: 1px solid #cbd5e0;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #2b6cb0;
+      box-shadow: 0 0 0 3px rgba(43,108,176,.15);
+    }
+
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: #a0aec0;
+      margin: 20px 0 10px;
+      grid-column: 1 / -1;
+    }
+
+    .btn {
+      margin-top: 24px;
+      padding: 12px 32px;
+      background: linear-gradient(135deg, #2b6cb0, #1a365d);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Result box ── */
+    #result { display: none; margin-top: 24px; }
+    .result-card {
+      border-radius: 12px;
+      padding: 28px;
+      text-align: center;
+    }
+    .result-card .aqi-value {
+      font-size: 3rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .result-card .aqi-label {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+    .result-card .aqi-sub {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      opacity: 0.75;
+    }
+
+    /* AQI colours */
+    .cat-good        { background: #f0fff4; border: 2px solid #68d391; color: #276749; }
+    .cat-satisfactory{ background: #f0fff4; border: 2px solid #48bb78; color: #276749; }
+    .cat-moderate    { background: #fffff0; border: 2px solid #f6e05e; color: #744210; }
+    .cat-poor        { background: #fff5f5; border: 2px solid #fc8181; color: #742a2a; }
+    .cat-very-poor   { background: #fff5f5; border: 2px solid #e53e3e; color: #742a2a; }
+    .cat-severe      { background: #faf5ff; border: 2px solid #9f7aea; color: #44337a; }
+
+    .error-msg {
+      color: #e53e3e;
+      font-size: 0.88rem;
+      margin-top: 12px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 3px solid rgba(255,255,255,.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .info-note {
+      font-size: 0.8rem;
+      color: #718096;
+      background: #f7fafc;
+      border-left: 3px solid #90cdf4;
+      padding: 10px 14px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🌿 AQI Prediction — India</h1>
+  <p>Machine Learning model trained on India-wide air quality data</p>
+</header>
+
+<nav id="nav">
+  <button class="active" data-tab="metrics">📊 Model Metrics</button>
+  <button data-tab="predict">🔮 Predict AQI</button>
+</nav>
+
+<!-- ═══════════════════ METRICS TAB ═══════════════════ -->
+<div id="metrics" class="tab-content active">
+  <div class="card">
+    <h2>All Models — Performance on Test Data</h2>
+    <p style="font-size:.82rem;color:#718096;margin-bottom:14px;">
+      Trained on 841,812 rows of hourly AQI data from 29 Indian cities. Best model highlighted in blue.
+    </p>
+    <div id="metrics-loading" style="color:#718096; padding:20px 0;">Loading metrics…</div>
+    <table id="metrics-table" style="display:none">
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>MAE ↓</th>
+          <th>RMSE ↓</th>
+          <th>R² ↑</th>
+          <th>Accuracy (%)</th>
+          <th>Train Time (s)</th>
+        </tr>
+      </thead>
+      <tbody id="metrics-body"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>🏆 Final Prediction Model</h2>
+    <p style="font-size:.88rem;color:#4a5568;">
+      The prediction uses a <strong>hybrid ensemble</strong>:
+      <br><br>
+      <code style="background:#edf2f7;padding:4px 8px;border-radius:4px;">
+        Final AQI = (0.8 × LightGBM) + (0.2 × XGBoost)
+      </code>
+      <br><br>
+      Both models were fine-tuned separately using <code>Special_Pipeline.py</code> achieving ~80% accuracy on a no-pollutant feature set, and even higher when pollutant data is available.
+    </p>
+  </div>
+</div>
+
+<!-- ═══════════════════ PREDICT TAB ═══════════════════ -->
+<div id="predict" class="tab-content">
+  <div class="card">
+    <h2>Predict AQI for a Location</h2>
+    <p class="info-note">
+      ℹ️ Fill in the details below. Lag and rolling window features are automatically
+      approximated from the values you enter — you don't need to calculate them manually.
+    </p>
+
+    <form id="predict-form">
+      <div class="form-grid">
+
+        <div class="section-label">📍 Location & Time</div>
+
+        <div class="form-group">
+          <label for="city">City</label>
+          <select id="city" name="City" required></select>
+        </div>
+        <div class="form-group">
+          <label for="state">State</label>
+          <select id="state" name="State" required></select>
+        </div>
+        <div class="form-group">
+          <label for="year">Year</label>
+          <input type="number" id="year" name="Year" value="2025" min="2020" max="2030" required />
+        </div>
+        <div class="form-group">
+          <label for="month">Month (1–12)</label>
+          <input type="number" id="month" name="Month" value="3" min="1" max="12" required />
+        </div>
+        <div class="form-group">
+          <label for="day">Day (1–31)</label>
+          <input type="number" id="day" name="Day" value="21" min="1" max="31" required />
+        </div>
+        <div class="form-group">
+          <label for="hour">Hour (0–23)</label>
+          <input type="number" id="hour" name="Hour" value="12" min="0" max="23" required />
+        </div>
+
+        <div class="section-label">🌤️ Weather Conditions</div>
+
+        <div class="form-group">
+          <label for="temp">Temperature (°C)</label>
+          <input type="number" id="temp" name="Temp_2m_C" step="0.1" value="25.0" required />
+        </div>
+        <div class="form-group">
+          <label for="humidity">Humidity (%)</label>
+          <input type="number" id="humidity" name="Humidity_Percent" step="0.1" value="60.0" required />
+        </div>
+        <div class="form-group">
+          <label for="wind">Wind Speed (km/h)</label>
+          <input type="number" id="wind" name="Wind_Speed_10m_kmh" step="0.1" value="10.0" required />
+        </div>
+        <div class="form-group">
+          <label for="pressure">Pressure (hPa)</label>
+          <input type="number" id="pressure" name="Pressure_MSL_hPa" step="0.1" value="1013.0" required />
+        </div>
+        <div class="form-group">
+          <label for="raining">Is it Raining?</label>
+          <select id="raining" name="Is_Raining">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+
+        <div class="section-label">💨 Pollutant Concentrations (µg/m³)</div>
+
+        <div class="form-group">
+          <label for="pm25">PM2.5</label>
+          <input type="number" id="pm25" name="PM2_5_ugm3" step="0.1" value="35.0" required />
+        </div>
+        <div class="form-group">
+          <label for="pm10">PM10</label>
+          <input type="number" id="pm10" name="PM10_ugm3" step="0.1" value="55.0" required />
+        </div>
+        <div class="form-group">
+          <label for="co">CO</label>
+          <input type="number" id="co" name="CO_ugm3" step="1" value="450" required />
+        </div>
+        <div class="form-group">
+          <label for="no2">NO₂</label>
+          <input type="number" id="no2" name="NO2_ugm3" step="0.1" value="30.0" required />
+        </div>
+        <div class="form-group">
+          <label for="so2">SO₂</label>
+          <input type="number" id="so2" name="SO2_ugm3" step="0.1" value="10.0" required />
+        </div>
+        <div class="form-group">
+          <label for="o3">O₃</label>
+          <input type="number" id="o3" name="O3_ugm3" step="0.1" value="50.0" required />
+        </div>
+        <div class="form-group">
+          <label for="dust">Dust</label>
+          <input type="number" id="dust" name="Dust_ugm3" step="0.1" value="1.0" required />
+        </div>
+
+      </div><!-- /form-grid -->
+
+      <button type="submit" class="btn" id="submit-btn">🔮 Predict AQI</button>
+      <div class="error-msg" id="error-msg"></div>
+    </form>
+  </div>
+
+  <div id="result">
+    <div class="card result-card" id="result-card">
+      <div class="aqi-value" id="result-aqi">—</div>
+      <div class="aqi-label" id="result-category">—</div>
+      <div class="aqi-sub" id="result-sub">—</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── API base URL (same origin when served by FastAPI) ──
+  const API = '';
+
+  // ── Tab switching ──
+  document.querySelectorAll('nav button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── Load metrics ──
+  async function loadMetrics() {
+    try {
+      const res = await fetch(`${API}/metrics`);
+      const data = await res.json();
+      const tbody = document.getElementById('metrics-body');
+
+      // Find best model by R2
+      const bestModel = Object.entries(data).sort((a, b) => b[1].R2 - a[1].R2)[0][0];
+
+      for (const [model, m] of Object.entries(data)) {
+        const tr = document.createElement('tr');
+        if (model === bestModel) tr.classList.add('best-model');
+        tr.innerHTML = `
+          <td>${model} ${model === bestModel ? '<span class="badge badge-best">Best R²</span>' : ''}</td>
+          <td>${m.MAE}</td>
+          <td>${m.RMSE}</td>
+          <td>${m.R2}</td>
+          <td>${m.Accuracy}%</td>
+          <td>${m.Training_Time_s}s</td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      document.getElementById('metrics-loading').style.display = 'none';
+      document.getElementById('metrics-table').style.display = 'table';
+    } catch (e) {
+      document.getElementById('metrics-loading').textContent = 'Failed to load metrics.';
+    }
+  }
+
+  // ── Load cities ──
+  const CITY_STATE_MAP = {};
+  async function loadCities() {
+    try {
+      const res = await fetch(`${API}/cities`);
+      const data = await res.json();
+      const citySelect = document.getElementById('city');
+      const stateSelect = document.getElementById('state');
+
+      for (const [city, state] of Object.entries(data.city_state_map)) {
+        CITY_STATE_MAP[city] = state;
+        const opt = document.createElement('option');
+        opt.value = city;
+        opt.textContent = city;
+        citySelect.appendChild(opt);
+      }
+
+      // Populate all states
+      const allStates = [...new Set(Object.values(data.city_state_map))].sort();
+      for (const st of allStates) {
+        const opt = document.createElement('option');
+        opt.value = st;
+        opt.textContent = st;
+        stateSelect.appendChild(opt);
+      }
+
+      // Auto-fill state when city changes
+      citySelect.addEventListener('change', () => {
+        const state = CITY_STATE_MAP[citySelect.value];
+        if (state) stateSelect.value = state;
+      });
+
+      // Trigger once for default selection
+      citySelect.dispatchEvent(new Event('change'));
+    } catch(e) {}
+  }
+
+  // ── Category → CSS class ──
+  function catClass(cat) {
+    return 'cat-' + cat.toLowerCase().replace(' ', '-');
+  }
+
+  // ── Prediction form ──
+  document.getElementById('predict-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    const errEl = document.getElementById('error-msg');
+    errEl.textContent = '';
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Predicting…';
+
+    // Build payload from form
+    const fd = new FormData(e.target);
+    const payload = {};
+    for (const [k, v] of fd.entries()) {
+      payload[k] = isNaN(v) || v === '' ? v : Number(v);
+    }
+
+    try {
+      const res = await fetch(`${API}/predict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Server error');
+      }
+
+      const data = await res.json();
+      const resultEl = document.getElementById('result');
+      const card     = document.getElementById('result-card');
+      const aqiEl    = document.getElementById('result-aqi');
+      const catEl    = document.getElementById('result-category');
+      const subEl    = document.getElementById('result-sub');
+
+      // Remove old category classes
+      card.className = 'result-card ' + catClass(data.category);
+      aqiEl.textContent = data.predicted_aqi;
+      catEl.textContent = data.category;
+      subEl.textContent = `XGBoost: ${data.xgb_prediction} · LightGBM: ${data.lgb_prediction} · Hybrid (80/20): ${data.predicted_aqi}`;
+
+      resultEl.style.display = 'block';
+      resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch(err) {
+      errEl.textContent = '⚠️ ' + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '🔮 Predict AQI';
+    }
+  });
+
+  // ── Init ──
+  loadMetrics();
+  loadCities();
+</script>
+</body>
+</html>
