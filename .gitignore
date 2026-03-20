@@ -1,0 +1,19 @@
+# Python venv
+AQI-prediction---INDIA/hello/
+AQI-prediction---INDIA/aqi-deploy/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.csv
+
+# Data files (too large for GitHub)
+AQI-prediction---INDIA/data/
+AQI-prediction---INDIA/models/knn.pkl
+
+# Editor
+.vscode/
+.idea/
