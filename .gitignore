@@ -7,12 +7,12 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.pkl
-*.csv
 
 # Data files (too large for GitHub)
 AQI-prediction---INDIA/data/
 AQI-prediction---INDIA/models/knn.pkl
+AQI-prediction---INDIA/models/extra_trees.pkl
+AQI-prediction---INDIA/models/random_forest.pkl
 
 # Editor
 .vscode/
